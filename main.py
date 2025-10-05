@@ -1,49 +1,41 @@
 
-import os
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from dotenv import load_dotenv
+import os
 
-# ============================================
-# 1️⃣ Import các module phụ (phân tích cảm xúc)
-# ============================================
-from mood_analyzer import detect_lang, analyze_mood
-from response_generator import generate_supportive_reply, generate_general_reply
-
-# ============================================
-# 2️⃣ Tải biến môi trường (.env)
-# ============================================
+# ===========================================
+# 🔹 Khởi tạo
+# ===========================================
 load_dotenv()
-CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
-CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
+app = FastAPI(title="AI Mood Buddy - LINE Webhook", version="1.0.0")
+
+CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
+CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 
 if not CHANNEL_SECRET or not CHANNEL_ACCESS_TOKEN:
-    print("[WARN] Missing LINE credentials. Please fill .env or environment variables on Render.")
+    print("[WARN] Missing LINE credentials. Fill .env first.")
 
-# ============================================
-# 3️⃣ Khởi tạo ứng dụng FastAPI và LINE SDK
-# ============================================
-app = FastAPI(title="AI Mood Buddy - LINE Webhook", version="1.0.0")
 line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN) if CHANNEL_ACCESS_TOKEN else None
 handler = WebhookHandler(CHANNEL_SECRET) if CHANNEL_SECRET else None
 
-# ============================================
-# 4️⃣ Endpoint kiểm tra trạng thái server
-# ============================================
-@app.get("/health")
-def health():
-    return {"ok": True, "status": "running"}
+# ===========================================
+# 🔹 Route test (GET)
+# ===========================================
 @app.get("/")
 def root():
     return {"message": "AI Mood Buddy is running!"}
 
+@app.get("/health")
+def health():
+    return {"ok": True, "status": "running"}
 
-# ============================================
-# 5️⃣ Webhook endpoint cho LINE Messaging API
-# ============================================
+# ===========================================
+# 🔹 Route nhận tin nhắn từ LINE (POST)
+# ===========================================
 @app.post("/callback")
 async def callback(request: Request):
     if handler is None:
@@ -57,33 +49,21 @@ async def callback(request: Request):
     except InvalidSignatureError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    return JSONResponse(content={"message": "OK"})
+    return JSONResponse({"status": "ok"})   # <-- QUAN TRỌNG! LINE cần 200 OK
 
-# ============================================
-# 6️⃣ Xử lý tin nhắn người dùng LINE
-# ============================================
-@handler.add(MessageEvent, message=TextMessage) if handler else (lambda f: f)
-def handle_message(event: MessageEvent):
-    user_text = event.message.text.strip()
-    lang = detect_lang(user_text)  # 'vi' or 'zh' or 'unk'
-    mood = analyze_mood(user_text, lang)
+# ===========================================
+# 🔹 Xử lý message
+# ===========================================
+@handler.add(MessageEvent, message=TextMessage)
+def handle_message(event):
+    user_text = event.message.text
+    reply_text = f"Bạn vừa nói: {user_text}"
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
 
-    # Phân loại cảm xúc & sinh phản hồi
-    is_question = user_text.endswith("?") or ("？" in user_text)
-    negative = mood in ["sad", "anxious", "angry", "stressed", "lonely", "tired"]
-
-    if is_question and not negative:
-        reply = generate_general_reply(user_text, lang)
-    else:
-        reply = generate_supportive_reply(user_text, mood, lang)
-
-    if line_bot_api:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
-
-# ============================================
-# 7️⃣ Khởi động server (Render cấp PORT động)
-# ============================================
+# ===========================================
+# 🔹 Chạy server
+# ===========================================
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8000))  # Render sẽ inject PORT (thường là 10000)
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
