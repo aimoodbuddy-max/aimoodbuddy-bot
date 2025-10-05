@@ -36,6 +36,10 @@ handler = WebhookHandler(CHANNEL_SECRET) if CHANNEL_SECRET else None
 @app.get("/health")
 def health():
     return {"ok": True, "status": "running"}
+@app.get("/")
+def root():
+    return {"message": "AI Mood Buddy is running!"}
+
 
 # ============================================
 # 5️⃣ Webhook endpoint cho LINE Messaging API
