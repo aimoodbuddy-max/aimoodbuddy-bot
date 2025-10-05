@@ -6,8 +6,8 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
-from mood_analyzer import detect_lang
-from response_generator import generate_ai_reply
+# 🧠 Import các hàm từ mood_analyzer
+from mood_analyzer import detect_lang, analyze_mood, generate_friend_like_reply
 
 load_dotenv()
 CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
@@ -47,18 +47,31 @@ async def callback(request: Request):
     return JSONResponse({"status": "ok"})
 
 
+# 🗣️ Khi người dùng gửi tin nhắn
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event: MessageEvent):
     user_text = event.message.text.strip()
-    lang = detect_lang(user_text)
-    reply = generate_ai_reply(user_text, lang)
 
+    # 🔍 Phát hiện ngôn ngữ
+    lang = detect_lang(user_text)
+
+    # 💭 Phân tích cảm xúc
+    mood = analyze_mood(user_text, lang)
+
+    # ❤️ Sinh phản hồi tự nhiên, giống người bạn
+    reply = generate_friend_like_reply(user_text, mood, lang)
+
+    # Gửi lại tin nhắn
     if line_bot_api:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=reply)
+        )
 
 
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+
 
