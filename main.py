@@ -7,8 +7,8 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
-from utils.mood_analyzer import detect_lang, analyze_mood
-from utils.response_generator import generate_supportive_reply, generate_general_reply
+from mood_analyzer import detect_lang, analyze_mood
+from response_generator import generate_supportive_reply, generate_general_reply
 
 load_dotenv()
 CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
